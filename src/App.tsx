@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { Navigation, PageContainer, type View } from '@/components/Navigation';
 import { LoginPage } from '@/pages/LoginPage';
@@ -17,8 +17,13 @@ function AppContent() {
   const { citizen } = useAuth();
   const [view, setView] = useState<View>('dashboard');
   const [selectedService, setSelectedService] = useState<string | null>(null);
-  const [isAdminMode, setIsAdminMode] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+    if (citizen) {
+      setView(citizen.role === 'admin' ? 'admin-dashboard' : 'dashboard');
+    }
+  }, [citizen?.id]);
 
   if (!citizen) {
     return showRegister
@@ -36,11 +41,7 @@ function AppContent() {
     setView('marketplace');
   };
 
-  const handleToggleRole = () => {
-    const newMode = !isAdminMode;
-    setIsAdminMode(newMode);
-    setView(newMode ? 'admin-dashboard' : 'dashboard');
-  };
+  const isAdmin = citizen.role === 'admin';
 
   const renderView = () => {
     if (selectedService) {
@@ -80,8 +81,6 @@ function AppContent() {
       <Navigation
         currentView={view}
         onNavigate={handleNavigate}
-        onToggleRole={handleToggleRole}
-        isAdminMode={isAdminMode}
       />
       <PageContainer>
         {renderView()}

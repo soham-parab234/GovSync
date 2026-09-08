@@ -1,4 +1,4 @@
-import { Shield, Menu, X, LogOut, LayoutDashboard, Store, FileCheck2, History, Server, Settings } from 'lucide-react';
+import { Shield, Menu, X, LogOut, LayoutDashboard, Store, FileCheck2, History, Server } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
 
@@ -27,16 +27,13 @@ const adminNav: NavItem[] = [
 export function Navigation({
   currentView,
   onNavigate,
-  onToggleRole,
-  isAdminMode,
 }: {
   currentView: View;
   onNavigate: (view: View) => void;
-  onToggleRole: () => void;
-  isAdminMode: boolean;
 }) {
   const { citizen, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isAdminMode = citizen?.role === 'admin';
   const navItems = isAdminMode ? adminNav : citizenNav;
 
   return (
@@ -78,16 +75,6 @@ export function Navigation({
             </nav>
 
             <div className="flex items-center gap-2">
-              {citizen && (
-                <button
-                  onClick={onToggleRole}
-                  className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                  title="Switch between citizen and admin views"
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  {isAdminMode ? 'Citizen View' : 'Admin View'}
-                </button>
-              )}
               <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-50">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gov-500 to-teal-500 flex items-center justify-center text-white text-sm font-semibold">
                   {citizen?.name.charAt(0) || '?'}
@@ -137,15 +124,6 @@ export function Navigation({
                 </button>
               );
             })}
-            {citizen && (
-              <button
-                onClick={onToggleRole}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600"
-              >
-                <Settings className="w-4 h-4" />
-                {isAdminMode ? 'Switch to Citizen View' : 'Switch to Admin View'}
-              </button>
-            )}
           </div>
         )}
       </header>
