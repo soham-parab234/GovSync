@@ -1,21 +1,62 @@
 import { useState } from 'react';
-import { Shield, LogIn, Loader as Loader2, GraduationCap, CircleAlert as AlertCircle, Building2, UserPlus } from 'lucide-react';
+import { Shield, LogIn, Loader as Loader2, GraduationCap, CircleAlert as AlertCircle, Building2, UserPlus, Eye, EyeOff, Mail, Fingerprint, Phone } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { demoCitizens } from '@/lib/mockApi/seedData';
 
+type LoginMethod = 'email' | 'aadhaar' | 'phone';
+
 export function LoginPage({ onRegister }: { onRegister: () => void }) {
-  const { login, loginAsDemo, loading, error } = useAuth();
-  const [email, setEmail] = useState('');
+  const { login, loginWithIdentifier, loginAsDemo, loading, error } = useAuth();
+  const [method, setMethod] = useState<LoginMethod>('email');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const methodTabs: { id: LoginMethod; label: string; icon: typeof Mail }[] = [
+    { id: 'email', label: 'Email', icon: Mail },
+    { id: 'aadhaar', label: 'Aadhaar', icon: Fingerprint },
+    { id: 'phone', label: 'Phone', icon: Phone },
+  ];
+
+  const fieldConfig: Record<LoginMethod, { label: string; placeholder: string; type: string; maxLength?: number }> = {
+    email: { label: 'Email', placeholder: 'aarav.sharma@govsync.demo', type: 'email' },
+    aadhaar: { label: 'Aadhaar Number', placeholder: '2345 6789 0123', type: 'text', maxLength: 14 },
+    phone: { label: 'Phone Number', placeholder: '98765 43210', type: 'tel', maxLength: 10 },
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      if (method === 'email') {
+        await login(identifier, password);
+      } else {
+        await loginWithIdentifier(identifier, password, method);
+      }
     } catch {
       // error is set in context
     }
   };
+
+  const handleMethodChange = (m: LoginMethod) => {
+    setMethod(m);
+    setIdentifier('');
+  };
+
+  const handleIdentifierChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (method === 'aadhaar') {
+      const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
+      const formatted = digits.replace(/(\d{4})(\d{4})(\d{0,4})/, (_, a, b, c) =>
+        c ? `${a} ${b} ${c}` : b ? `${a} ${b}` : a,
+      );
+      setIdentifier(formatted);
+    } else if (method === 'phone') {
+      setIdentifier(e.target.value.replace(/\D/g, '').slice(0, 10));
+    } else {
+      setIdentifier(e.target.value);
+    }
+  };
+
+  const fc = fieldConfig[method];
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
@@ -66,27 +107,59 @@ export function LoginPage({ onRegister }: { onRegister: () => void }) {
           <p className="text-slate-500 mb-8">Enter your credentials or pick a demo account below.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Login method tabs */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+              {methodTabs.map((tab) => {
+                const TabIcon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => handleMethodChange(tab.id)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      method === tab.id
+                        ? 'bg-white text-gov-700 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    <TabIcon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">{fc.label}</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="aarav.sharma@govsync.demo"
+                type={fc.type}
+                value={identifier}
+                onChange={handleIdentifierChange}
+                placeholder={fc.placeholder}
+                maxLength={fc.maxLength}
                 className="input-field"
                 required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="demo1234"
-                className="input-field"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="demo1234"
+                  className="input-field pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {error && (

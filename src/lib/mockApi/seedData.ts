@@ -8,6 +8,8 @@ export const demoCitizens: DemoCitizen[] = [
     password: 'demo1234',
     role: 'citizen',
     description: 'Eligible student — meets all scholarship criteria',
+    aadhaar: '2345 6789 0123',
+    phone: '98765 43210',
   },
   {
     id: 'citizen-002',
@@ -16,6 +18,8 @@ export const demoCitizens: DemoCitizen[] = [
     password: 'demo1234',
     role: 'citizen',
     description: 'Income exceeds threshold — demonstrates eligibility failure',
+    aadhaar: '3456 7890 1234',
+    phone: '98760 54321',
   },
   {
     id: 'citizen-003',
@@ -24,6 +28,8 @@ export const demoCitizens: DemoCitizen[] = [
     password: 'demo1234',
     role: 'citizen',
     description: 'Name conflict between departments — demonstrates conflict detection',
+    aadhaar: '4567 8901 2345',
+    phone: '98750 65432',
   },
   {
     id: 'admin-001',
@@ -32,6 +38,8 @@ export const demoCitizens: DemoCitizen[] = [
     password: 'admin1234',
     role: 'admin',
     description: 'Government administrator — access admin dashboard',
+    aadhaar: '5678 9012 3456',
+    phone: '98740 76543',
   },
 ];
 
@@ -171,15 +179,15 @@ export const citizenMockData: Record<string, Record<string, DepartmentData>> = {
         { subject: 'Medieval India', marks: 70, year: 2023 },
       ],
     },
-    // Note: name differs from identity — triggers conflict detection
+    // Note: address differs from identity — triggers conflict detection
     residence: {
       source: 'residence',
-      address: '78 Park Street, Kolkata, West Bengal',
+      address: '14 Camac Street, Park Street Area, Kolkata, West Bengal',
       residenceType: 'Rented',
       verified: true,
       district: 'Kolkata',
       state: 'West Bengal',
-      pincode: '700016',
+      pincode: '700017',
     },
     documents: {
       source: 'documents',
@@ -206,29 +214,53 @@ export function isEmailRegistered(email: string): boolean {
   );
 }
 
+export function isIdentifierRegistered(identifier: string, method: 'email' | 'aadhaar' | 'phone'): boolean {
+  const norm = identifier.replace(/\s/g, '').toLowerCase();
+  return demoCitizens.some((c) => {
+    if (method === 'email') return c.email.toLowerCase() === norm;
+    if (method === 'aadhaar') return (c.aadhaar || '').replace(/\s/g, '') === norm;
+    if (method === 'phone') return (c.phone || '').replace(/\s/g, '') === norm;
+    return false;
+  });
+}
+
+function computeAgeFromDob(dob: string): number {
+  const birth = new Date(dob);
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
 export function generateCitizenMockData(
   citizenId: string,
   name: string,
+  dob: string,
   documents: { type: string; name: string; issuedBy: string; issueDate: string; verified: boolean }[],
 ): Record<string, DepartmentData> {
   const suffix = citizenId.replace(/[^0-9a-z]/gi, '').slice(-4).padStart(4, '0');
+  const age = computeAgeFromDob(dob);
+  const address = 'Address on file with UIDAI';
   return {
     identity: {
       source: 'identity',
       name,
       fatherName: '—',
-      dob: '1998-06-15',
-      age: 27,
+      dob,
+      age,
       gender: '—',
       aadhaarNumber: `XXXX-XXXX-${suffix}`,
       photo: '',
-      address: 'Address on file with UIDAI',
+      address,
       verified: true,
     },
     income: {
       source: 'income',
-      annualIncome: 450000,
-      taxPaid: 15000,
+      annualIncome: 100000,
+      taxPaid: 0,
       employer: 'Self Employed',
       panNumber: `ABCD${suffix}E`,
       assessmentYear: '2024-25',
@@ -237,22 +269,22 @@ export function generateCitizenMockData(
       source: 'education',
       highestQualification: 'Graduate',
       institution: 'State University',
-      passPercentage: 78,
+      passPercentage: 88,
       graduationYear: 2020,
       marksheets: [],
     },
     residence: {
       source: 'residence',
-      address: 'Address on file with UIDAI',
+      address,
       residenceType: 'Owned',
       verified: true,
-      district: '—',
-      state: '—',
-      pincode: '—',
+      district: 'Central District',
+      state: 'Home State',
+      pincode: '110001',
     },
     documents: {
       source: 'documents',
-      documents,
+      documents: documents.map((d) => ({ ...d, verified: true })),
     },
   };
 }

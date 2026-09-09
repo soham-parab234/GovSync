@@ -238,4 +238,6 @@ export interface DemoCitizen {
   role: 'citizen' | 'admin';
   description: string;
   registered?: boolean;
+  aadhaar?: string;
+  phone?: string;
 }

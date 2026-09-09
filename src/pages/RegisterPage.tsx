@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, ArrowLeft, ArrowRight, Loader as Loader2, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Phone, Fingerprint, FolderLock, FileText, GraduationCap, ReceiptIndianRupee, KeyRound, User, Mail, Lock } from 'lucide-react';
+import { Shield, ArrowLeft, ArrowRight, Loader as Loader2, CircleAlert as AlertCircle, CircleCheck as CheckCircle2, Phone, Fingerprint, FolderLock, FileText, GraduationCap, ReceiptIndianRupee, KeyRound, User, Mail, Lock, Eye, EyeOff, Calendar } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 type Step = 'details' | 'verify' | 'otp' | 'digilocker' | 'documents' | 'done';
@@ -31,6 +31,9 @@ export function RegisterPage({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [dob, setDob] = useState('');
   const [phone, setPhone] = useState('');
   const [aadhaar, setAadhaar] = useState('');
   const [verifyMethod, setVerifyMethod] = useState<'phone' | 'aadhaar'>('phone');
@@ -105,6 +108,7 @@ export function RegisterPage({ onBack }: { onBack: () => void }) {
         password,
         phone: verifyMethod === 'phone' ? phone : undefined,
         aadhaar: verifyMethod === 'aadhaar' ? aadhaar : undefined,
+        dob,
         documents: docs,
       });
       setStep('done');
@@ -242,19 +246,39 @@ export function RegisterPage({ onBack }: { onBack: () => void }) {
                   />
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Date of Birth</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="date"
+                    value={dob}
+                    onChange={(e) => setDob(e.target.value)}
+                    className="input-field pl-10"
+                    required
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Password</label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Min 6 characters"
-                      className="input-field pl-10"
+                      className="input-field pl-10 pr-10"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
                 <div>
@@ -262,19 +286,26 @@ export function RegisterPage({ onBack }: { onBack: () => void }) {
                   <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                     <input
-                      type="password"
+                      type={showConfirmPassword ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Re-enter"
-                      className="input-field pl-10"
+                      className="input-field pl-10 pr-10"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => {
-                  if (!name || !email || !password || !confirmPassword) {
+                  if (!name || !email || !password || !confirmPassword || !dob) {
                     setError('Please fill in all fields.');
                     return;
                   }

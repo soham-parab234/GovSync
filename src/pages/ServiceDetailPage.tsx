@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, Shield, Fingerprint, ReceiptIndianRupee, GraduationCap, Home, FolderLock, CheckCircle2, AlertCircle, Clock, Loader2, XCircle, FileCheck2, Send } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Shield, Fingerprint, ReceiptIndianRupee, GraduationCap, Chrome as Home, FolderLock, CircleCheck as CheckCircle2, CircleAlert as AlertCircle, Clock, Loader as Loader2, Circle as XCircle, FileCheck2, Send } from 'lucide-react';
 import { fetchServiceById, createApplication, addApplicationEvent, createConsentRecord, updateApplicationStatus, addAuditLog } from '@/lib/db';
 import { fetchAllDepartments } from '@/lib/mockApi/adapters';
 import { normalizeData, detectConflicts, evaluateEligibility, getDataRequirements } from '@/lib/engine';
@@ -8,7 +8,7 @@ import type { Service, DataSource, FetchResult, NormalizedProfile, DataConflict,
 import { Card, Modal } from '@/components/ui';
 import { getIcon } from '@/components/ui/Badges';
 
-type Step = 'detail' | 'consent' | 'fetching' | 'profile' | 'eligibility' | 'submit' | 'done';
+type Step = 'detail' | 'consent' | 'fetching' | 'profile' | 'conflict_resolution' | 'eligibility' | 'submit' | 'done';
 
 const sourceIcons: Record<DataSource, typeof Fingerprint> = {
   identity: Fingerprint,
@@ -39,6 +39,8 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
   const [conflicts, setConflicts] = useState<DataConflict[]>([]);
   const [eligibility, setEligibility] = useState<EligibilityResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [conflictSelections, setConflictSelections] = useState<Record<number, string>>({});
+  const [manualInputs, setManualInputs] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetchServiceById(serviceId)
@@ -97,31 +99,67 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
       conflicts: detectedConflicts,
     });
 
-    // Eligibility
+    if (detectedConflicts.length > 0) {
+      setStep('conflict_resolution');
+    } else if (normalized) {
+      await proceedToEligibility(app.id, normalized);
+    }
+  };
+
+  const proceedToEligibility = async (appId: string, normalizedProfile: NormalizedProfile) => {
+    if (!citizen || !service) return;
+
     setStep('eligibility');
-    await updateApplicationStatus(app.id, 'eligibility_checking');
-    await addApplicationEvent(app.id, 'eligibility_check', 'Checking Eligibility', 'Running deterministic rule-based eligibility engine', 'eligibility_checking');
+    await updateApplicationStatus(appId, 'eligibility_checking');
+    await addApplicationEvent(appId, 'eligibility_check', 'Checking Eligibility', 'Running deterministic rule-based eligibility engine', 'eligibility_checking');
 
     await new Promise((resolve) => setTimeout(resolve, 800));
 
-    if (normalized && service.eligibility_rules) {
-      const result = evaluateEligibility(service.eligibility_rules as any, normalized);
+    if (service.eligibility_rules) {
+      const result = evaluateEligibility(service.eligibility_rules as any, normalizedProfile);
       setEligibility(result);
 
       const status = result.eligible ? 'eligible' : result.needsReview ? 'needs_review' : 'not_eligible';
-      await updateApplicationStatus(app.id, status as any, { eligibility_result: result });
+      await updateApplicationStatus(appId, status as any, { eligibility_result: result });
       await addApplicationEvent(
-        app.id,
+        appId,
         'eligibility_result',
         result.eligible ? 'Eligibility Confirmed' : result.needsReview ? 'Manual Review Required' : 'Not Eligible',
         result.summary,
         status,
         { rules: result.rules },
       );
-      await addAuditLog(citizen.id, 'citizen', 'ELIGIBILITY_CHECKED', 'application', app.id, { eligible: result.eligible, needs_review: result.needsReview });
+      await addAuditLog(citizen.id, 'citizen', 'ELIGIBILITY_CHECKED', 'application', appId, { eligible: result.eligible, needs_review: result.needsReview });
     }
 
     setStep('submit');
+  };
+
+  const allConflictsResolved = conflicts.every((_, i) => !!conflictSelections[i]?.trim());
+
+  const handleConflictResolve = async () => {
+    if (!applicationId || !profile || !citizen || !allConflictsResolved) return;
+
+    const correctedProfile = { ...profile };
+    const corrections: { field: string; oldValue: string; newValue: string }[] = [];
+
+    conflicts.forEach((conflict, i) => {
+      const correctedValue = conflictSelections[i]?.trim();
+      if (correctedValue) {
+        if (conflict.field === 'Address' && correctedValue !== correctedProfile.address) {
+          corrections.push({ field: conflict.field, oldValue: correctedProfile.address, newValue: correctedValue });
+          correctedProfile.address = correctedValue;
+        }
+      }
+    });
+
+    setProfile(correctedProfile);
+
+    await addApplicationEvent(applicationId, 'data_corrected', 'Data Conflicts Resolved', `${corrections.length} field(s) corrected by citizen`, 'data_fetched', { corrections });
+    await addAuditLog(citizen.id, 'citizen', 'DATA_CORRECTED', 'application', applicationId, { corrections });
+    await updateApplicationStatus(applicationId, 'data_fetched', { normalized_data: correctedProfile });
+
+    await proceedToEligibility(applicationId, correctedProfile);
   };
 
   const handleSubmit = async () => {
@@ -307,7 +345,7 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
       )}
 
       {/* Step: Eligibility / Profile Review */}
-      {(step === 'eligibility' || step === 'submit') && profile && (
+      {(step === 'conflict_resolution' || step === 'eligibility' || step === 'submit') && profile && (
         <div className="grid lg:grid-cols-3 gap-6 animate-fade-in">
           <div className="lg:col-span-2 space-y-6">
             {/* Unified Profile */}
@@ -333,18 +371,68 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
                 <ProfileField label="Documents Verified" value={profile.documentsVerified ? 'Yes' : 'No'} source="DigiLocker" />
               </div>
 
-              {/* Conflicts */}
-              {conflicts.length > 0 && (
+              {/* Conflicts — interactive resolution or resolved banner */}
+              {step === 'conflict_resolution' && conflicts.length > 0 && (
                 <div className="mt-4 p-4 rounded-lg border border-amber-200 bg-amber-50">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-3">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <p className="font-medium text-sm text-amber-800">Data Conflicts Detected</p>
+                    <p className="font-medium text-sm text-amber-800">Data Conflicts Detected — Please Review</p>
                   </div>
                   {conflicts.map((c, i) => (
-                    <div key={i} className="text-xs text-amber-700 mt-1">
-                      <strong>{c.field}:</strong> {c.description}
+                    <div key={i} className="mb-4 last:mb-0 p-3 rounded-lg bg-white border border-amber-200">
+                      <p className="font-medium text-sm text-slate-900 mb-1">{c.field}</p>
+                      <p className="text-xs text-slate-500 mb-3">{c.description}</p>
+                      <div className="space-y-2">
+                        {c.values.map((val, vi) => (
+                          <button
+                            key={vi}
+                            type="button"
+                            onClick={() => {
+                              setConflictSelections((prev) => ({ ...prev, [i]: val }));
+                              setManualInputs((prev) => ({ ...prev, [i]: '' }));
+                            }}
+                            className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${
+                              conflictSelections[i] === val ? 'border-gov-500 bg-gov-50' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                              conflictSelections[i] === val ? 'border-gov-500 bg-gov-500' : 'border-slate-300'
+                            }`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-slate-500">{c.sources[vi]}</p>
+                              <p className="text-sm text-slate-900">{val}</p>
+                            </div>
+                          </button>
+                        ))}
+                        <div className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                          conflictSelections[i] && !c.values.includes(conflictSelections[i]) ? 'border-gov-500 bg-gov-50' : 'border-slate-200'
+                        }`}>
+                          <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${
+                            conflictSelections[i] && !c.values.includes(conflictSelections[i]) ? 'border-gov-500 bg-gov-500' : 'border-slate-300'
+                          }`} />
+                          <input
+                            type="text"
+                            value={manualInputs[i] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setManualInputs((prev) => ({ ...prev, [i]: val }));
+                              setConflictSelections((prev) => ({ ...prev, [i]: val }));
+                            }}
+                            placeholder="Enter correct value manually"
+                            className="flex-1 px-3 py-1.5 rounded-md border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-gov-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
                     </div>
                   ))}
+                </div>
+              )}
+              {step === 'submit' && conflicts.length > 0 && (
+                <div className="mt-4 p-4 rounded-lg border border-teal-200 bg-teal-50">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                    <p className="font-medium text-sm text-teal-800">Data Conflicts Resolved</p>
+                  </div>
                 </div>
               )}
             </Card>
@@ -393,11 +481,30 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
           {/* Submit Panel */}
           <div>
             <Card className="sticky top-24">
-              <h3 className="font-serif font-semibold text-slate-900 mb-2">Submit Application</h3>
+              <h3 className="font-serif font-semibold text-slate-900 mb-2">
+                {step === 'conflict_resolution' ? 'Resolve Conflicts' : 'Submit Application'}
+              </h3>
               <p className="text-sm text-slate-500 mb-4">
-                Review your profile and eligibility above. When ready, submit your application with one click.
+                {step === 'conflict_resolution'
+                  ? 'Please resolve the data conflicts in your profile before proceeding to eligibility check.'
+                  : 'Review your profile and eligibility above. When ready, submit your application with one click.'}
               </p>
-              {eligibility && (
+              {step === 'conflict_resolution' ? (
+                <div className="mb-4">
+                  <div className={`p-3 rounded-lg border text-sm flex items-center gap-2 ${
+                    allConflictsResolved
+                      ? 'bg-teal-50 border-teal-200 text-teal-800'
+                      : 'bg-amber-50 border-amber-200 text-amber-800'
+                  }`}>
+                    {allConflictsResolved
+                      ? <CheckCircle2 className="w-4 h-4" />
+                      : <AlertCircle className="w-4 h-4" />}
+                    {allConflictsResolved
+                      ? 'All conflicts resolved. You can proceed.'
+                      : `${conflicts.filter((_, i) => !conflictSelections[i]?.trim()).length} conflict(s) remaining to resolve.`}
+                  </div>
+                </div>
+              ) : eligibility && (
                 <div className="mb-4">
                   {eligibility.eligible ? (
                     <div className="p-3 rounded-lg bg-teal-50 border border-teal-200 text-sm text-teal-800 flex items-center gap-2">
@@ -414,14 +521,25 @@ export function ServiceDetailPage({ serviceId, onBack, onNavigate }: { serviceId
                   )}
                 </div>
               )}
-              <button
-                onClick={handleSubmit}
-                disabled={submitting || (eligibility !== null && !eligibility.eligible && !eligibility.needsReview)}
-                className="btn-primary w-full"
-              >
-                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                {submitting ? 'Submitting...' : 'Submit Application'}
-              </button>
+              {step === 'conflict_resolution' ? (
+                <button
+                  onClick={handleConflictResolve}
+                  disabled={!allConflictsResolved}
+                  className="btn-primary w-full"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  Continue to Eligibility
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || (eligibility !== null && !eligibility.eligible && !eligibility.needsReview)}
+                  className="btn-primary w-full"
+                >
+                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {submitting ? 'Submitting...' : 'Submit Application'}
+                </button>
+              )}
             </Card>
           </div>
         </div>

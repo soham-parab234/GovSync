@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import { demoCitizens, addRegisteredCitizen, generateCitizenMockData, isEmailRegistered } from '@/lib/mockApi/seedData';
+import { demoCitizens, addRegisteredCitizen, generateCitizenMockData, isEmailRegistered, isIdentifierRegistered } from '@/lib/mockApi/seedData';
 import type { DemoCitizen } from '@/lib/types';
 
 interface AuthState {
@@ -14,11 +14,15 @@ interface RegisterData {
   password: string;
   phone?: string;
   aadhaar?: string;
+  dob: string;
   documents: { type: string; name: string; issuedBy: string; issueDate: string; verified: boolean }[];
 }
 
+type LoginMethod = 'email' | 'aadhaar' | 'phone';
+
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<DemoCitizen>;
+  loginWithIdentifier: (identifier: string, password: string, method: LoginMethod) => Promise<DemoCitizen>;
   logout: () => void;
   loginAsDemo: (citizenId: string) => void;
   register: (data: RegisterData) => Promise<DemoCitizen>;
@@ -61,6 +65,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return citizen;
   }, []);
 
+  const loginWithIdentifier = useCallback(
+    async (identifier: string, password: string, method: LoginMethod): Promise<DemoCitizen> => {
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const norm = identifier.replace(/\s/g, '').toLowerCase();
+      const citizen = demoCitizens.find((c) => {
+        let match = false;
+        if (method === 'email') {
+          match = c.email.toLowerCase() === norm;
+        } else if (method === 'aadhaar') {
+          match = (c.aadhaar || '').replace(/\s/g, '').toLowerCase() === norm;
+        } else if (method === 'phone') {
+          match = (c.phone || '').replace(/\s/g, '').toLowerCase() === norm;
+        }
+        return match && c.password === password;
+      });
+
+      const label = method === 'email' ? 'email' : method === 'aadhaar' ? 'Aadhaar number' : 'phone number';
+      if (!citizen) {
+        setState({ citizen: null, loading: false, error: `Invalid ${label} or password. Try a demo account below.` });
+        throw new Error('Invalid credentials');
+      }
+
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(citizen));
+      setState({ citizen, loading: false, error: null });
+      return citizen;
+    },
+    [],
+  );
+
   const logout = useCallback(() => {
     sessionStorage.removeItem(STORAGE_KEY);
     setState({ citizen: null, loading: false, error: null });
@@ -93,9 +129,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: 'citizen',
       description: 'Registered via DigiLocker',
       registered: true,
+      aadhaar: data.aadhaar,
+      phone: data.phone,
     };
 
-    const mockData = generateCitizenMockData(citizenId, data.name, data.documents);
+    const mockData = generateCitizenMockData(citizenId, data.name, data.dob, data.documents);
     addRegisteredCitizen(citizen, mockData);
 
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(citizen));
@@ -104,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, loginAsDemo, register }}>
+    <AuthContext.Provider value={{ ...state, login, loginWithIdentifier, logout, loginAsDemo, register }}>
       {children}
     </AuthContext.Provider>
   );
