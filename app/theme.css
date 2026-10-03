@@ -1,0 +1,25 @@
+/* Edit these tokens to customise the portal. See CUSTOMIZATION.md. */
+:root {
+  color-scheme: light;
+  --brand-primary:#102B3A; --brand-primary-hover:#09212F;
+  --brand-secondary:#B94220; --brand-secondary-strong:#A53819;
+  --brand-accent:#B94220; --brand-accent-hover:#993318; --accent-text:#FFFFFF;
+  --page-background:#FBF5E9; --surface:#FFFDFA; --surface-muted:#F5EBDC;
+  --text:#172F3C; --text-muted:#5C6465; --text-inverse:#FFFFFF;
+  --border:#DED5C5; --border-strong:#968D7F; --focus:#102B3A;
+  --login-background:#FBF0DA;
+  --heading-font:Georgia,"Times New Roman",serif;
+  --illustration:url('/images/citizen-login-illustration.png');
+  --success:#226444; --success-soft:#E8F3EC;
+  --warning:#785018; --warning-soft:#FFF6E5; --warning-border:#E5C18A;
+  --danger:#A02C35; --danger-soft:#FCEDEE; --danger-border:#E5BBC0;
+  --font-family:"Segoe UI",Arial,Helvetica,sans-serif;
+  --font-family-local:"Nirmala UI","Mangal","Segoe UI",sans-serif;
+  --content-width:1360px; --radius:6px; --shadow:0 3px 16px rgb(24 45 73 / 5%);
+  --hero-image-position:center;
+  /* Existing workflow compatibility aliases */
+  --ink:var(--text);--navy:var(--brand-primary);--blue:var(--brand-secondary);--blue-soft:var(--surface-muted);
+  --teal:var(--success);--maroon:var(--brand-primary);--maroon-dark:var(--brand-primary-hover);
+  --sand:var(--page-background);--paper:var(--surface);--line:var(--border);--line-soft:var(--border);
+  --muted:var(--text-muted);--green:var(--success);--amber:var(--warning);--red:var(--danger);
+}

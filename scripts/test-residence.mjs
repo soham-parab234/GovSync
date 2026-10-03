@@ -1,0 +1,62 @@
+import {testAccounts} from './test-accounts.mjs';
+import assert from 'node:assert/strict';
+const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5173';
+if(!['127.0.0.1','localhost'].includes(new URL(base).hostname))throw new Error('Local tests only.');
+const {cookie,adminCookie}=await testAccounts(base);
+let count=0;
+async function call(path,data,status=200,headers={Cookie:cookie}){
+ const r=await fetch(base+'/api/'+path,{method:data===undefined?'GET':'POST',headers:{Origin:base,...headers,...(path.endsWith('/decision')?{Cookie:adminCookie}:{}),...(data===undefined?{}:{'Content-Type':'application/json'})},body:data===undefined?undefined:JSON.stringify(data)});
+ const j=await r.json();assert.equal(r.status,status,path+': '+JSON.stringify(j));count++;return j;
+}
+const scopes=['identity','residence','documents'];
+const create=async(extra={})=>(await call('applications',{service:'residence',citizenId:'DEMO-1001',scopes,accepted:true,...extra},201)).application;
+async function verify(a){for(const d of scopes)await call('departments/'+d+'/'+a.citizen_id+'?applicationId='+a.id);return call('applications/'+a.id+'/evaluate',{});}
+await call('applications',{service:'residence',citizenId:'DEMO-1001',scopes:['identity','residence'],accepted:true},400);
+await call('applications',{service:'bogus',citizenId:'DEMO-1001',scopes,accepted:true},400);
+const a=await create({simulateMismatch:true});assert.match(a.id,/^RES-\d{4}-/);
+await call('applications/'+a.id+'/certificate',undefined,409);
+await call('applications/'+a.id+'/decision',{decision:'approved'},409);
+await call('departments/income/'+a.citizen_id+'?applicationId='+a.id,undefined,403);
+await call('applications/'+a.id+'/evaluate',{},409);
+const mismatch=await verify(a);assert.equal(mismatch.result.status,'needs_review');
+await call('applications/'+a.id+'/submit',{confirmed:true},409);
+let details={...mismatch.result.details,address:'Flat 12, Andheri East'};
+for(const bad of [{address:'Fake changed address'},{residenceSince:2020},{purpose:'Unsupported'},{documentId:'MADE-UP'}]){
+ const r=await call('applications/'+a.id+'/evaluate',{details:{...details,...bad}});assert.equal(r.result.status,'needs_review');
+}
+const valid=await call('applications/'+a.id+'/evaluate',{details});assert.equal(valid.result.status,'eligible');
+await call('applications/'+a.id+'/submit',{confirmed:false},400);
+const submitted=await call('applications/'+a.id+'/submit',{confirmed:true});assert.equal(submitted.application.status,'submitted');
+assert.equal((await call('applications/'+a.id+'/submit',{confirmed:true})).application.submitted_at,submitted.application.submitted_at);
+await call('applications/'+a.id+'/evaluate',{},409);
+await call('departments/residence/'+a.citizen_id+'?applicationId='+a.id,undefined,409);
+await call('applications/'+a.id+'/decision',{decision:'clarification',note:'short'},400);
+await call('applications/'+a.id+'/decision',{decision:'clarification',note:'Please confirm your residence since 2018.'});
+await call('applications/'+a.id+'/certificate',undefined,409);
+await call('applications/'+a.id+'/clarify',{note:'I confirm my residence has been at this address since 2018.'});
+await call('applications/'+a.id+'/decision',{decision:'approved',note:''});
+const cert=await call('applications/'+a.id+'/certificate');assert.equal(cert.certificate.reference,a.id);assert.equal(cert.certificate.profile.address,details.address);assert.ok(cert.certificate.notice.includes('not a government certificate'));
+await call('applications/'+a.id+'/decision',{decision:'rejected',note:'Should not replace approval.'},409);
+const schScopes=['identity','education','income','residence'];
+const scholarship=(await call('applications',{citizenId:'DEMO-1001',scopes:schScopes,accepted:true},201)).application;
+await call('applications/'+scholarship.id+'/reuse-residence',{sourceId:a.id});
+for(const d of schScopes.filter(x=>x!=='residence'))await call('departments/'+d+'/DEMO-1001?applicationId='+scholarship.id);
+assert.equal((await call('applications/'+scholarship.id+'/evaluate',{})).result.status,'eligible');
+const other=(await call('applications',{citizenId:'DEMO-1002',scopes:schScopes,accepted:true},201)).application;
+await call('applications/'+other.id+'/reuse-residence',{sourceId:a.id},403);
+await call('applications/'+a.id+'/revoke',{});
+await call('applications/'+scholarship.id+'/reuse-residence',{sourceId:a.id},403);
+const b=await create();await verify(b);await call('applications/'+b.id+'/submit',{confirmed:true});
+await call('applications/'+b.id+'/decision',{decision:'rejected',note:'The sample application requires a corrected source record.'});
+await call('applications/'+b.id+'/certificate',undefined,409);
+await call('applications/'+b.id+'/submit',{confirmed:true},409);
+const outage=await create();
+await call('departments/residence/DEMO-1001?applicationId='+outage.id+'&simulate=unavailable',undefined,503);
+assert.equal((await verify(outage)).result.status,'eligible');
+await call('applications/'+outage.id+'/revoke',{});
+await call('applications/'+outage.id+'/submit',{confirmed:true},403);
+const w=await call('workspace');
+assert.ok(w.audit.some(e=>e.action==='Department decision'&&e.outcome==='approved'&&e.application_id===a.id));
+assert.ok(w.audit.some(e=>e.action==='Verified residence reused'&&e.application_id===scholarship.id));
+assert.equal(w.applications.find(x=>x.id===a.id).status,'approved');
+console.log('PASS: '+count+' residence HTTP assertions: consent, mismatch, field tampering, review, clarification, approval, rejection, certificate, reuse and outage recovery.');

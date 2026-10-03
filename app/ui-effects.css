@@ -1,0 +1,192 @@
+/* =============================================================
+   UI EFFECTS LAYER
+   Rounded controls, button shimmer, card lifts, entrance motion.
+   COLOURS AND IMAGES ARE NOT CHANGED HERE: every colour below is
+   an existing token from theme.css (or a transparent mix of one),
+   and no image is replaced. Delete this file (and its import in
+   layout.tsx) to return to the previous look.
+   ============================================================= */
+:root{
+  --radius:18px;
+  --ease:cubic-bezier(.22,.8,.3,1);
+  --glow:color-mix(in srgb,var(--brand-accent) 38%,transparent);
+  --glow-soft:color-mix(in srgb,var(--brand-accent) 16%,transparent);
+  --lift:0 26px 40px -26px color-mix(in srgb,var(--brand-primary) 55%,transparent);
+  --lift-soft:0 12px 30px -24px color-mix(in srgb,var(--brand-primary) 50%,transparent);
+}
+html{scroll-behavior:smooth}
+::selection{background:var(--glow);color:var(--brand-primary)}
+
+/* ---------- Buttons ---------- */
+.btn{position:relative;overflow:hidden;border-radius:999px;padding-inline:22px;transition:transform .25s var(--ease),box-shadow .3s,background .25s,border-color .25s,color .25s}
+.btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 12px 22px -14px var(--glow)}
+.btn:active:not(:disabled){transform:translateY(0) scale(.98)}
+.btn svg{transition:transform .3s var(--ease)}
+.btn:hover:not(:disabled) svg{transform:translateX(4px)}
+.btn.logout:hover:not(:disabled) svg{transform:translateX(3px) scale(1.05)}
+.btn.primary,.btn.gold{box-shadow:0 10px 20px -14px var(--glow)}
+.btn.primary::before,.btn.gold::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 30%,rgb(255 255 255 / 32%) 50%,transparent 70%);transform:translateX(-130%);transition:transform .7s var(--ease)}
+.btn.primary:hover:not(:disabled)::before,.btn.gold:hover:not(:disabled)::before{transform:translateX(130%)}
+.btn.primary:hover:not(:disabled),.btn.gold:hover:not(:disabled){box-shadow:0 16px 28px -14px var(--glow)}
+.btn.small{padding-inline:15px}
+.login-submit{border-radius:999px}
+.text-link{position:relative;text-decoration:none!important;background:linear-gradient(currentColor,currentColor) 0 100%/0 2px no-repeat;padding-bottom:4px;transition:background-size .35s var(--ease),gap .3s var(--ease)}
+.text-link:hover{background-size:100% 2px;gap:11px}
+.text-link svg{transition:transform .3s var(--ease)}
+.text-link:hover svg{transform:translateX(3px)}
+
+/* ---------- Header and navigation ---------- */
+.brand-mark{transition:transform .5s var(--ease)}
+.brand:hover .brand-mark{transform:rotate(-5deg) scale(1.08)}
+.brand-copy strong{transition:color .25s}
+.brand:hover .brand-copy strong{color:var(--brand-secondary-strong)}
+.nav-item{position:relative;border-radius:12px 12px 0 0;transition:color .25s,background .25s}
+.nav-item::after{content:"";position:absolute;left:8px;right:8px;bottom:-3px;height:3px;border-radius:3px 3px 0 0;background:var(--brand-secondary);transform:scaleX(0);transform-origin:left;transition:transform .35s var(--ease)}
+.nav-item:hover::after,.nav-item.active::after,.nav-item[aria-current="page"]::after{transform:scaleX(1)}
+.login-language{border-radius:999px;padding:0 10px;transition:background .25s,box-shadow .25s}
+.login-language:hover{background:var(--surface-muted);box-shadow:0 8px 18px -12px var(--glow)}
+.logout:hover:not(:disabled){background:var(--surface-muted)}
+.utility-links a,.utility-links button{transition:color .2s}
+.text-size-controls button{border-radius:8px;padding:2px 7px;transition:background .2s,transform .2s}
+.text-size-controls button:hover:not(:disabled){background:var(--surface);transform:translateY(-1px)}
+
+/* ---------- Login ---------- */
+.login-page:before{animation:gs-drift 16s ease-in-out infinite alternate}
+.login-brand img{transition:transform .5s var(--ease)}
+.login-brand:hover img{transform:scale(1.06) rotate(-3deg)}
+.login-story>*{animation:gs-rise .8s var(--ease) backwards}
+.login-story>*:nth-child(2){animation-delay:.1s}.login-story>*:nth-child(3){animation-delay:.2s}.login-story>*:nth-child(4){animation-delay:.3s}
+.login-illustration{animation:gs-rise .9s var(--ease) .35s backwards,gs-float 9s ease-in-out 1.3s infinite}
+.login-panel{border-radius:26px;animation:gs-rise .9s var(--ease) .15s backwards;transition:box-shadow .4s,transform .4s var(--ease)}
+.login-panel:hover{box-shadow:0 24px 60px -24px color-mix(in srgb,var(--brand-primary) 40%,transparent)}
+.login-roles{border-radius:16px;padding:5px;gap:4px;background:var(--surface-muted)}
+.login-roles button{border-radius:12px;border-bottom:0;transition:background .25s,box-shadow .25s,transform .2s,color .25s}
+.login-roles button:hover{background:color-mix(in srgb,var(--brand-accent) 10%,transparent)}
+.login-roles button svg{transition:transform .35s var(--ease)}
+.login-roles button:hover svg{transform:scale(1.15) rotate(-6deg)}
+.login-roles button[aria-pressed=true]{border-bottom:0;box-shadow:0 8px 18px -12px var(--glow),inset 0 0 0 1.5px var(--brand-accent)}
+.login-input{border-radius:14px;transition:border-color .25s,box-shadow .25s,background .25s}
+.login-input:hover{border-color:var(--brand-secondary)}
+.login-input:focus-within{box-shadow:0 0 0 5px var(--glow-soft)}
+.login-input>svg{transition:color .25s,transform .3s var(--ease)}
+.login-input:focus-within>svg{color:var(--brand-secondary-strong);transform:scale(1.12)}
+.login-input>button{border-radius:50%;transition:background .2s}
+.login-input>button:hover{background:var(--surface-muted)}
+.recovery-confirm code{border-radius:14px}
+
+/* ---------- Dashboard hero ---------- */
+.dashboard-hero{border:1px solid var(--border);border-radius:30px;box-shadow:var(--lift-soft)}
+.dashboard-hero-copy>*{animation:gs-rise .8s var(--ease) backwards}
+.dashboard-hero-copy>*:nth-child(2){animation-delay:.08s}.dashboard-hero-copy>*:nth-child(3){animation-delay:.16s}.dashboard-hero-copy>*:nth-child(4){animation-delay:.24s}
+.dashboard-hero .eyebrow{display:inline-block;padding:5px 14px;border-radius:999px;background:var(--glow-soft)}
+.dashboard-art{transition:transform 1.4s var(--ease);transform-origin:70% 60%}
+.dashboard-hero:hover .dashboard-art{transform:scale(1.045)}
+.dashboard-search{border-radius:999px;box-shadow:0 14px 28px -22px var(--glow);transition:box-shadow .3s,border-color .3s,transform .3s var(--ease)}
+.dashboard-search:hover{border-color:var(--brand-secondary);transform:translateY(-2px)}
+.dashboard-search:focus-within{border-color:var(--brand-secondary);box-shadow:0 0 0 5px var(--glow-soft),0 18px 30px -22px var(--glow)}
+.dashboard-search input:focus,.dashboard-search input:focus-visible{outline:none}
+.dashboard-search>svg{transition:color .25s,transform .3s var(--ease)}
+.dashboard-search:focus-within>svg{color:var(--brand-secondary-strong);transform:scale(1.12)}
+
+/* ---------- Section headings ---------- */
+.section-heading h2{position:relative;padding-bottom:10px}
+.section-heading h2::after{content:"";position:absolute;left:0;bottom:0;width:38px;height:4px;border-radius:99px;background:var(--brand-secondary);transition:width .45s var(--ease)}
+.section-heading:hover h2::after{width:72px}
+.section-heading>a{transition:gap .3s var(--ease),color .2s}
+.section-heading>a:hover{gap:12px}
+
+/* ---------- Popular shortcuts ---------- */
+.popular-item{position:relative;border-radius:18px;transition:transform .35s var(--ease),box-shadow .35s,border-color .25s,background .25s}
+.popular-item:hover{transform:translateY(-6px);box-shadow:var(--lift)}
+.popular-item>span{transition:transform .45s var(--ease),box-shadow .3s}
+.popular-item:hover>span{transform:rotate(-10deg) scale(1.12);box-shadow:0 10px 18px -10px var(--glow)}
+.popular-item>svg{transition:transform .3s var(--ease)}
+.popular-item:hover>svg{transform:translateX(5px)}
+
+/* ---------- Cards and panels ---------- */
+.panel{border-radius:var(--radius);box-shadow:var(--lift-soft);transition:box-shadow .35s,border-color .3s}
+.service-card{position:relative;isolation:isolate;border-radius:22px;transition:transform .4s var(--ease),box-shadow .4s,border-color .3s}
+.service-card::after{content:"";position:absolute;right:-70px;bottom:-90px;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,var(--glow-soft),transparent 70%);z-index:-1;transition:transform .7s var(--ease)}
+.service-card:hover{transform:translateY(-8px);box-shadow:var(--lift)}
+.service-card:hover::after{transform:scale(1.9)}
+.service-card-top svg{box-sizing:content-box;padding:10px;border-radius:14px;background:var(--surface-muted);transition:background .3s,color .3s,transform .45s var(--ease),border-radius .45s var(--ease),box-shadow .3s}
+.service-card:hover .service-card-top svg{background:var(--brand-accent);color:var(--accent-text);transform:rotate(-8deg) scale(1.06);border-radius:50%;box-shadow:0 12px 20px -10px var(--glow)}
+.service-card>svg{transition:background .3s,color .3s,transform .45s var(--ease)}
+.service-card:hover>svg{background:var(--brand-accent);color:var(--accent-text);transform:rotate(-8deg)}
+.service-category{padding:3px 11px;border-radius:99px;background:var(--surface-muted)}
+.stat.panel{transition:transform .35s var(--ease),box-shadow .35s}
+.stat.panel:hover{transform:translateY(-5px);box-shadow:var(--lift)}
+.scheme{border-radius:22px;transition:transform .35s var(--ease),box-shadow .35s}
+.scheme:hover{transform:translateY(-4px);box-shadow:var(--lift)}
+.recent-row{border-radius:12px;padding-inline:8px;margin-inline:-8px;width:calc(100% + 16px);transition:background .25s,transform .3s var(--ease)}
+.recent-row:hover{background:var(--surface-muted);transform:translateX(6px)}
+.recent-empty svg{animation:gs-float 6s ease-in-out infinite}
+.notifications,.receipt,.rules{border-radius:16px}
+
+/* ---------- Forms ---------- */
+.field input,.field textarea,.review-toolbar input,.review-toolbar select{border-radius:12px;transition:border-color .25s,box-shadow .25s,background .25s}
+.field input:hover:not([readonly]),.field textarea:hover,.review-toolbar input:hover,.review-toolbar select:hover{border-color:var(--brand-secondary)}
+.field input:focus,.field textarea:focus,.review-toolbar input:focus{box-shadow:0 0 0 5px var(--glow-soft)}
+.choice{border-radius:12px!important;transition:border-color .25s,box-shadow .25s}
+.choice:hover{border-color:var(--brand-secondary)!important}
+[data-slot="select-content"]{border-radius:16px;box-shadow:0 24px 44px -20px color-mix(in srgb,var(--brand-primary) 45%,transparent)}
+[data-slot="select-item"]{border-radius:10px;transition:background .2s}
+.consent-row{border-radius:12px;padding-inline:10px;margin-inline:-10px;transition:background .25s,transform .25s var(--ease)}
+.consent-row:hover{background:var(--surface-muted);transform:translateX(4px)}
+[data-slot="checkbox"]{transition:transform .2s,background .2s,border-color .2s}
+[data-slot="checkbox"]:hover{transform:scale(1.12);border-color:var(--brand-secondary)}
+.note{border-radius:14px}
+.badge{border-radius:999px;padding-inline:11px}
+
+/* ---------- Workflow steps ---------- */
+.step{transition:color .25s}
+.step-num{transition:transform .3s var(--ease),background .3s,border-color .3s}
+.step:hover .step-num{transform:scale(1.12)}
+.step.active .step-num{box-shadow:0 0 0 5px var(--glow-soft)}
+.rule-row,.info-item,.tracking-list li{border-radius:10px;transition:background .2s,padding-left .25s var(--ease),transform .25s var(--ease)}
+.rule-row:hover,.info-item:hover{background:var(--surface-muted);padding-left:8px}
+.tracking-list li:hover{background:var(--surface-muted);transform:translateX(6px)}
+
+/* ---------- Tables, tabs ---------- */
+.data-table tbody tr{transition:background .2s}
+.tab-list{border-radius:999px!important}
+.tab-trigger{border-radius:999px!important;transition:background .25s,transform .25s,box-shadow .25s}
+.tab-trigger:not([data-state="active"]):hover{transform:translateY(-1px)}
+
+/* ---------- Footer ---------- */
+.footer-links button,.footer-links a{position:relative;transition:color .2s,padding-left .3s var(--ease)}
+.footer-links button:hover,.footer-links a:hover{color:var(--brand-secondary-strong);padding-left:10px}
+
+/* ---------- Sample citizens on the login page ---------- */
+.demo-citizens{margin-top:26px}
+.demo-divider{display:flex;align-items:center;gap:14px;font-size:.8125rem;font-weight:600;color:var(--text-muted);margin-bottom:16px}
+.demo-divider::before,.demo-divider::after{content:"";flex:1;height:1px;background:var(--border)}
+.demo-divider span{text-align:center}
+.demo-grid{display:grid;gap:10px}
+.demo-citizen{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:12px 16px;border:1px solid var(--border);border-radius:16px;background:var(--surface);color:var(--text);position:relative;overflow:hidden;transition:transform .3s var(--ease),box-shadow .3s,border-color .25s,background .25s}
+.demo-citizen:hover:not(:disabled){transform:translateY(-3px);border-color:var(--brand-secondary);background:var(--surface-muted);box-shadow:var(--lift-soft)}
+.demo-citizen:active:not(:disabled){transform:translateY(0) scale(.99)}
+.demo-citizen:disabled{opacity:.55;cursor:not-allowed}
+.demo-avatar{display:grid;place-items:center;flex-shrink:0;width:44px;height:44px;border-radius:50%;font-size:.875rem;font-weight:700;letter-spacing:.02em;background:#F7DFC8;color:#9C361E;transition:transform .4s var(--ease),box-shadow .3s}
+.demo-citizen.tone-1 .demo-avatar{background:#EDE7F1;color:#674B73}
+.demo-citizen.tone-2 .demo-avatar{background:#E5EDE3;color:#3E6449}
+.demo-citizen:hover:not(:disabled) .demo-avatar{transform:rotate(-8deg) scale(1.1);box-shadow:0 10px 18px -10px var(--glow)}
+.demo-copy{display:flex;flex-direction:column;min-width:0;flex:1}
+.demo-copy strong{font-size:.9375rem;font-weight:650;color:var(--brand-primary)}
+.demo-copy small{font-size:.8125rem;color:var(--text-muted);margin-top:1px}
+.demo-citizen>svg{flex-shrink:0;color:var(--brand-secondary-strong);transition:transform .3s var(--ease)}
+.demo-citizen:hover:not(:disabled)>svg{transform:translateX(5px)}
+.demo-note{font-size:.8125rem;color:var(--text-muted);text-align:center;margin-top:14px}
+.demo-locked{display:block;margin-top:6px;font-size:.8125rem;color:var(--success)}
+
+/* ---------- Motion definitions ---------- */
+@keyframes gs-rise{from{opacity:0;transform:translateY(18px)}}
+@keyframes gs-float{50%{transform:translateY(-8px)}}
+@keyframes gs-drift{to{transform:translate(40px,26px) scale(1.07)}}
+
+@media(max-width:800px){.dashboard-hero{border-radius:22px}.login-panel{border-radius:20px}}
+@media(hover:none){.service-card:hover,.popular-item:hover,.stat.panel:hover,.scheme:hover{transform:none}}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation:none!important;transition-duration:.01ms!important}
+}

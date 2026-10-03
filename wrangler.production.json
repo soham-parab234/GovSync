@@ -1,0 +1,25 @@
+{
+  "name": "govsync",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "no_bundle": true,
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.js", "**/*.mjs"]
+    }
+  ],
+  "assets": {
+    "directory": "dist/client"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "govsync-demo",
+      "database_id": "c00579d6-6561-4b04-94cf-125ee8b4e26b",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

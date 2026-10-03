@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1788978342708,
+      "tag": "0000_warm_captain_flint",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790109963844,
+      "tag": "0001_white_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790195945921,
+      "tag": "0002_spooky_gwen_stacy",
+      "breakpoints": true
+    }
+  ]
+}
