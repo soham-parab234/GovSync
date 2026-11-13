@@ -1,7 +1,6 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
-import { sites } from "./build/sites-vite-plugin";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -52,7 +51,6 @@ export default defineConfig(async () => {
     server: { watch: { ignored: ['**/.sites-runtime/**', '**/.wrangler/**', '**/.private/**'], ...(isCodexSeatbeltSandbox ? { useFsEvents: false, usePolling: true } : {}) } },
     plugins: [
       vinext(),
-      sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         inspectorPort: false,

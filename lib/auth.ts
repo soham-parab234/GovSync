@@ -2,12 +2,13 @@ import {env} from 'cloudflare:workers';
 import {database,ApiError,body,reply} from './server';
 import {newToken,passwordHash,passwordMatches,tokenHash} from './password';
 import {citizens} from './demo';
+import type {UserRow} from './types';
 
 export type Account={id:string;name:string;mobile:string;role:'citizen'|'admin';citizenId?:string};
 const COOKIE='govsync_session';
 const sessionAge=8*60*60;
 // Sample-citizen accounts use the id 'demo:<citizenId>'. The client uses citizenId to pre-select and lock the applicant.
-const safeUser=(row:any):Account=>({id:row.id,name:row.name,mobile:row.role==='admin'?row.mobile.replace(/^admin:/,''):row.mobile,role:row.role,...(String(row.id).startsWith('demo:')?{citizenId:String(row.id).slice(5)}:{})});
+const safeUser=(row:UserRow):Account=>({id:row.id,name:row.name,mobile:row.role==='admin'?row.mobile.replace(/^admin:/,''):row.mobile,role:row.role,...(String(row.id).startsWith('demo:')?{citizenId:String(row.id).slice(5)}:{})});
 // Sample-citizen sign-in is on by default for demonstrations. Set GOVSYNC_DEMO_LOGIN=off to disable it.
 const demoLoginOn=()=>!['off','false','0'].includes(String((env as unknown as Record<string,string>).GOVSYNC_DEMO_LOGIN||'').toLowerCase());
 export function sameOrigin(request:Request){
@@ -21,7 +22,7 @@ export async function account(request:Request):Promise<Account>{
  sameOrigin(request);
  const token=cookieToken(request);
  if(!/^[a-f0-9]{64}$/.test(token))throw new ApiError(401,'Please sign in to continue.');
- const row=await database().prepare('SELECT u.id,u.name,u.mobile,u.role,u.password_hash FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash(token),Date.now()).first<any>();
+ const row=await database().prepare('SELECT u.id,u.name,u.mobile,u.role,u.password_hash FROM auth_sessions s JOIN auth_users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?').bind(tokenHash(token),Date.now()).first<UserRow>();
  if(!row)throw new ApiError(401,'Please sign in to continue.');
  if(row.role==='admin'){const provisioned=configuredAdmin();if(!provisioned||provisioned.id!==row.id||provisioned.mobile!==safeUser(row).mobile||provisioned.password_hash!==row.password_hash)throw new ApiError(401,'Please sign in to continue.');}
  return safeUser(row);
@@ -64,9 +65,9 @@ export async function authRoute(request:Request,action:string){
   if(!citizen)throw new ApiError(400,'Choose one of the sample citizens.');
   // The account has a random password nobody knows and a mobile value the sign-in form rejects, so it can only be reached through this button.
   const id='demo:'+citizen.id,mobile='demo-'+citizen.id.toLowerCase();
-  const existing=await db.prepare('SELECT * FROM auth_users WHERE id=?').bind(id).first<any>();
+  const existing=await db.prepare('SELECT * FROM auth_users WHERE id=?').bind(id).first<UserRow>();
   if(!existing)await db.prepare('INSERT INTO auth_users (id,name,mobile,role,password_hash,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT DO NOTHING').bind(id,citizen.name,mobile,'citizen',passwordHash(newToken()),Date.now()).run();
-  return signedIn(request,safeUser(existing||{id,name:citizen.name,mobile,role:'citizen'}));
+  return signedIn(request,safeUser(existing||{id,name:citizen.name,mobile,role:'citizen',password_hash:'',created_at:Date.now()}));
  }
  const data=await body(request),mobile=String(data.mobile||'').replace(/[०-९]/g,c=>String(c.charCodeAt(0)-0x966)).replace(/\s/g,'');
  if(!/^[6-9][0-9]{9}$/.test(mobile))throw new ApiError(400,'Enter a valid 10-digit Indian mobile number.');
@@ -91,13 +92,13 @@ export async function authRoute(request:Request,action:string){
    // Owner-provisioned credentials are never returned to the client or checked into source.
    await db.prepare('INSERT INTO auth_users (id,name,mobile,role,password_hash,created_at) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,mobile=excluded.mobile,password_hash=excluded.password_hash').bind(admin.id,admin.name,'admin:'+admin.mobile,'admin',admin.password_hash,Date.now()).run();
   }
-  const row=await db.prepare('SELECT * FROM auth_users WHERE mobile=? AND role=?').bind(data.role==='admin'?'admin:'+mobile:mobile,data.role).first<any>();
+  const row=await db.prepare('SELECT * FROM auth_users WHERE mobile=? AND role=?').bind(data.role==='admin'?'admin:'+mobile:mobile,data.role).first<UserRow>();
   const valid=passwordMatches(data.password,row?.password_hash||passwordHash('unavailable-account-password','00000000000000000000000000000000'));
-  if(!valid||row?.role!==data.role)throw new ApiError(401,'Mobile number, password or account type is incorrect.');
+  if(!valid||!row||row.role!==data.role)throw new ApiError(401,'Mobile number, password or account type is incorrect.');
   return signedIn(request,safeUser(row));
  }
  if(action==='recover'){
-  const row=await db.prepare('SELECT * FROM auth_users WHERE mobile=? AND role=?').bind(mobile,'citizen').first<any>();
+  const row=await db.prepare('SELECT * FROM auth_users WHERE mobile=? AND role=?').bind(mobile,'citizen').first<UserRow>();
   if(typeof data.recoveryCode!=='string'||!row?.recovery_hash||row.recovery_hash!==tokenHash(data.recoveryCode.trim()))throw new ApiError(400,'The mobile number or recovery code is incorrect.');
   const code=newToken(),changed=await db.prepare('UPDATE auth_users SET password_hash=?,recovery_hash=? WHERE id=? AND recovery_hash=? RETURNING id').bind(passwordHash(data.password),tokenHash(code),row.id,row.recovery_hash).first();
   if(!changed)throw new ApiError(400,'The mobile number or recovery code is incorrect.');

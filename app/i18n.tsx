@@ -1107,15 +1107,26 @@ export function translate(lang:Language,key:string,params:Record<string,string|n
  for(const [k,v] of Object.entries(params))value=value.replaceAll('{'+k+'}',typeof v==='number'?new Intl.NumberFormat(localeFor(lang)).format(v):v);
  return value;
 }
-const Context=createContext<any>(null);
+export interface LanguageContextType {
+ language: Language;
+ setLanguage: (lang: Language) => void;
+ t: (key: string, params?: Record<string, string | number>) => string;
+ n: (value: number, options?: Intl.NumberFormatOptions) => string;
+ date: (value: string, time?: boolean) => string;
+ value: (key: string, v: unknown) => string;
+}
+const Context=createContext<LanguageContextType|null>(null);
 export function LanguageProvider({children}:{children:React.ReactNode}){
- const [language,setLanguage]=useState<Language>('en');
- useEffect(()=>{try{const saved=localStorage.getItem('GovSync-language');if(saved==='hi'||saved==='mr')setLanguage(saved);}catch{}},[]);
+ const [language,setLanguage]=useState<Language>(()=>{
+  if(typeof window==='undefined')return 'en';
+  try{const saved=localStorage.getItem('GovSync-language');if(saved==='hi'||saved==='mr')return saved;}catch{}
+  return 'en';
+ });
  useEffect(()=>{document.documentElement.lang=language;try{localStorage.setItem('GovSync-language',language);}catch{}},[language]);
  const t=(key:string,params?:Record<string,string|number>)=>translate(language,key,params);
  const n=(value:number,options?:Intl.NumberFormatOptions)=>new Intl.NumberFormat(localeFor(language),options).format(value);
  const date=(value:string,time=false)=>new Intl.DateTimeFormat(localeFor(language),{day:'numeric',month:'short',year:'numeric',...(time?{hour:'2-digit' as const,minute:'2-digit' as const}:{})}).format(new Date(value));
- const value=(key:string,v:any)=>key==='dateOfBirth'?date(v):typeof v==='number'?n(v):key==='pin'?String(v).replace(/\d/g,(d:string)=>language==='en'?d:'०१२३४५६७८९'[Number(d)]):t(String(v??''));
+ const value=(key:string,v:unknown)=>key==='dateOfBirth'?date(String(v)):typeof v==='number'?n(v):key==='pin'?String(v).replace(/\d/g,(d:string)=>language==='en'?d:'०१२३४५६७८९'[Number(d)]):t(String(v??''));
  return <Context.Provider value={{language,setLanguage,t,n,date,value}}>{children}</Context.Provider>;
 }
-export const useLanguage=()=>useContext(Context);
+export const useLanguage=()=>{const ctx=useContext(Context);if(!ctx)throw new Error('useLanguage must be used within LanguageProvider');return ctx;};

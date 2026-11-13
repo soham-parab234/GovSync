@@ -29,13 +29,14 @@ export function normalize(department:Department,raw:Record<string,unknown>){
  const result:Record<string,unknown>={};
  for(const [source,target] of Object.entries(mappings[department])){let value=raw[source];if(target==='dateOfBirth'&&typeof value==='string'&&value.includes('/'))value=value.split('/').reverse().join('-');result[target]=value;}return result;
 }
-export function assess(records:Record<string,Record<string,any>>){
- const {identity,education,income,residence}=records;
+export function assess(records:Record<string,Record<string,unknown>>){
+ const identity=records.identity||{},education=records.education||{},income=records.income||{},residence=records.residence||{};
+ const educationMarks=Number(education.marks),annualIncome=Number(income.annualIncome);
  const rules=[
  {label:'Identity matches academic record',passed:identity.dateOfBirth===education.dateOfBirth&&identity.name===education.name,detail:'Name and date of birth must agree across sources.'},
- {label:'Academic score at least 75%',passed:education.marks>=75,detail:`${education.marks}% verified by Education`},
- {label:'Annual family income at most ₹2,50,000',passed:income.annualIncome<=250000,detail:`₹${Number(income.annualIncome).toLocaleString('en-IN')} verified by Income`},
- {label:'Verified Maharashtra domicile',passed:residence.state==='Maharashtra'&&residence.domicileVerified===true,detail:`${residence.state} · ${residence.district}`},
+ {label:'Academic score at least 75%',passed:educationMarks>=75,detail:`${educationMarks}% verified by Education`},
+ {label:'Annual family income at most ₹2,50,000',passed:annualIncome<=250000,detail:`₹${Number(annualIncome).toLocaleString('en-IN')} verified by Income`},
+ {label:'Verified Maharashtra domicile',passed:residence.state==='Maharashtra'&&residence.domicileVerified===true,detail:`${String(residence.state||'')} · ${String(residence.district||'')}`},
  ];const status=!rules[0].passed?'needs_review':rules.every(r=>r.passed)?'eligible':'ineligible';
  return {status,rules,profile:{...identity,...education,...income,...residence,name:identity.name,dateOfBirth:identity.dateOfBirth}};
 }

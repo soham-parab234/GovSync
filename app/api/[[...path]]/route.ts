@@ -2,10 +2,11 @@ import {account,authRoute} from '@/lib/auth';
 import {allDepartments,citizens,sampleRecord,normalize,assess,serviceDepartments,type Department,type Service} from '@/lib/demo';
 import {assessResidence,trackedStatuses} from '@/lib/residence';
 import {database,application,consent,event,body,reply,guarded,ApiError} from '@/lib/server';
+import type {ApplicationRecord,AssessmentResult} from '@/lib/types';
 export const dynamic='force-dynamic';
-const serviceOf=(app:any):Service=>app.service==='residence'?'residence':'scholarship';
-async function recordsFor(app:any) {
- const rows=await database().prepare('SELECT department,normalized FROM checks WHERE application_id = ?').bind(app.id).all<any>();
+const serviceOf=(app:{service?:string}):Service=>app.service==='residence'?'residence':'scholarship';
+async function recordsFor(app:{id:string;service?:string}) {
+ const rows=await database().prepare('SELECT department,normalized FROM checks WHERE application_id = ?').bind(app.id).all<{department:Department;normalized:string}>();
  if(!serviceDepartments[serviceOf(app)].every(d=>rows.results.some(r=>r.department===d)))throw new ApiError(409,'Complete all required department checks first.');
  return Object.fromEntries(rows.results.map(r=>[r.department,JSON.parse(r.normalized)]));
 }
@@ -15,9 +16,9 @@ export async function GET(request:Request){return guarded(async()=>{
  const actor=await account(request),user=actor.id;
  if(path[0]==='admin'&&path[1]==='mappings'&&path[2]){
   if(actor.role!=='admin')throw new ApiError(403,'Only administrators can view submitted application mappings.');
-  const app=await db.prepare("SELECT id,name,citizen_id,service,status FROM applications WHERE id=? AND status IN ('submitted','clarification','approved','rejected')").bind(path[2]).first<any>();
+  const app=await db.prepare("SELECT id,name,citizen_id,service,status FROM applications WHERE id=? AND status IN ('submitted','clarification','approved','rejected')").bind(path[2]).first<Pick<ApplicationRecord,'id'|'name'|'citizen_id'|'service'|'status'>>();
   if(!app)throw new ApiError(404,'Submitted application not found.');
-  const checks=await db.prepare('SELECT department,raw,normalized,checked_at FROM checks WHERE application_id=? ORDER BY department').bind(app.id).all<any>();
+  const checks=await db.prepare('SELECT department,raw,normalized,checked_at FROM checks WHERE application_id=? ORDER BY department').bind(app.id).all<{department:Department;raw:string;normalized:string;checked_at:string}>();
   return reply({application:app,checks:checks.results.map(row=>({...row,raw:JSON.parse(row.raw),normalized:JSON.parse(row.normalized)}))});
  }
  if(path[0]==='workspace'){
@@ -29,7 +30,7 @@ export async function GET(request:Request){return guarded(async()=>{
   const app=await application(path[1],user);
   if(path[2]==='certificate'){
    if(serviceOf(app)!=='residence'||app.status!=='approved')throw new ApiError(409,'Certificate is available only after department approval.');
-   return reply({certificate:{reference:app.id,issuedAt:app.decided_at,profile:JSON.parse(app.result).profile,notice:'DEMONSTRATION ONLY — not a government certificate'}});
+   return reply({certificate:{reference:app.id,issuedAt:app.decided_at,profile:JSON.parse(app.result||'{}').profile,notice:'DEMONSTRATION ONLY — not a government certificate'}});
   }
   const rows=await db.prepare('SELECT * FROM checks WHERE application_id = ?').bind(app.id).all();
   return reply({application:app,checks:rows.results});
@@ -56,7 +57,7 @@ export async function POST(request:Request){return guarded(async()=>{
  const actor=await account(request),user=actor.id,data=await body(request);
  if(path[0]==='applications'&&path[1]&&path[2]==='decision'){
   if(actor.role!=='admin')throw new ApiError(403,'Only administrators can review applications.');
-  const app=await db.prepare('SELECT * FROM applications WHERE id=?').bind(path[1]).first<any>();
+  const app=await db.prepare('SELECT * FROM applications WHERE id=?').bind(path[1]).first<ApplicationRecord>();
   if(!app)throw new ApiError(404,'Application not found.');
   if(app.status!=='submitted')throw new ApiError(409,'Only applications awaiting department review can be decided.');
   if(!['approved','clarification','rejected'].includes(data.decision))throw new ApiError(400,'Choose a valid decision.');
@@ -100,7 +101,7 @@ export async function POST(request:Request){return guarded(async()=>{
    const input=data.details??JSON.parse(app.details||'{}');
    if(!input||typeof input!=='object'||Array.isArray(input))throw new ApiError(400,'Invalid application details.');
    const result=service==='residence'?assessResidence(records,input):assess(records);
-   await db.batch([db.prepare('UPDATE applications SET status = ?, result = ?, details = ? WHERE id = ? AND owner = ?').bind(result.status,JSON.stringify(result),JSON.stringify(service==='residence'?(result as any).details:{}),app.id,user),event(user,app.id,'Validation checked',result.status==='eligible'?'success':'review',result.rules.filter(r=>!r.passed).map(r=>r.label).join('; ')||'All demonstration rules passed.')]);
+   await db.batch([db.prepare('UPDATE applications SET status = ?, result = ?, details = ? WHERE id = ? AND owner = ?').bind(result.status,JSON.stringify(result),JSON.stringify(service==='residence'?(result as AssessmentResult).details||{}:{}),app.id,user),event(user,app.id,'Validation checked',result.status==='eligible'?'success':'review',result.rules.filter(r=>!r.passed).map(r=>r.label).join('; ')||'All demonstration rules passed.')]);
    return reply({application:await application(app.id,user),result});
   }
   if(path[2]==='reuse-residence'){
@@ -109,7 +110,7 @@ export async function POST(request:Request){return guarded(async()=>{
    const source=await application(data.sourceId,user);
    if(source.service!=='residence'||source.status!=='approved'||source.citizen_id!==app.citizen_id)throw new ApiError(403,'Use an approved residence application for the same citizen.');
    consent(source,'residence');
-   const row=await db.prepare("SELECT raw,normalized FROM checks WHERE application_id = ? AND department = 'residence'").bind(source.id).first<any>();
+   const row=await db.prepare("SELECT raw,normalized FROM checks WHERE application_id = ? AND department = 'residence'").bind(source.id).first<{raw:string;normalized:string}>();
    if(!row)throw new ApiError(409,'Verified residence information is unavailable.');
    await db.batch([db.prepare("INSERT INTO checks (id,application_id,department,raw,normalized,checked_at) VALUES (?,?,'residence',?,?,?) ON CONFLICT(application_id,department) DO UPDATE SET raw=excluded.raw,normalized=excluded.normalized,checked_at=excluded.checked_at").bind(crypto.randomUUID(),app.id,row.raw,row.normalized,new Date().toISOString()),db.prepare("UPDATE applications SET status = 'draft', result = NULL WHERE id = ?").bind(app.id),event(user,app.id,'Verified residence reused','success',source.id,'residence')]);
    return reply({department:'residence',raw:JSON.parse(row.raw),normalized:JSON.parse(row.normalized)});

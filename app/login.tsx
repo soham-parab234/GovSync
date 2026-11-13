@@ -47,6 +47,6 @@ export default function Login({onLogin,initialRole='citizen',initialError=''}:{i
     </>}
    </section>
   </div>
-  <footer className="login-footer"><span>{siteConfig.name} · {t('')}</span><span>{t('.')}</span></footer>
+  <footer className="login-footer"><span>{siteConfig.name} · {t('Connected governance')}</span><span>{t('Sample department records. No live government integration.')}</span></footer>
  </main>;
 }
